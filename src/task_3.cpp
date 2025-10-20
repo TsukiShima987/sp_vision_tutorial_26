@@ -198,5 +198,6 @@ int main(int argc, char * argv[])
     cv::waitKey(1);
     // Your code end
   }
+  cv::destroyAllWindows();
   return 0;
 }
