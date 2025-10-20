@@ -1,5 +1,9 @@
 #include <chrono>
 #include <opencv2/opencv.hpp>
+#include <cmath>
+#include <nlohmann/json.hpp>
+#include <fmt/format.h>
+#include <algorithm>
 
 #include "io/camera.hpp"
 #include "io/gimbal/gimbal.hpp"
@@ -43,13 +47,63 @@ int main(int argc, char * argv[])
   Eigen::Quaterniond q;
   std::chrono::steady_clock::time_point t;
 
+  std::list<auto_aim::Armor> detected_armors;
+  int frame_count=0;
+  io::GimbalState gimbal_state;
+
+  const float Max_Yaw=M_PI;
+  const float Min_Yaw=-M_PI;
+  const float Max_Pitch=M_PI/9;
+  const float Min_Pitch=-M_PI/9;
+
   while (!exiter.exit()) {
     // Your code start
+    camera.read(img,t);
+    frame_count++;
 
+    detected_armors=yolo.detect(img,frame_count);
+    if(detected_armors.empty()){
+      gimbal.send(0,0,0.0f,0.0f);
+      continue;
+    }
 
+    gimbal_state=gimbal.state();
+    q=gimbal.q(t);
+
+    solver.set_R_gimbal2world(q);
+    auto_aim::Armor target_armor=detected_armors.front();
+    solver.solve(target_armor);
+
+    Eigen::Vector3d armor_world_xyz=target_armor.xyz_in_world;
+    Eigen::Matrix3d R_gimbal2world=solver.R_gimbal2world(); 
+    Eigen::Vector3d armor_gimbal_xyz=R_gimbal2world.transpose()*armor_world_xyz;
+
+    float target_yaw=atan2(armor_gimbal_xyz.y(),armor_gimbal_xyz.x());
+    float target_pitch=atan2(armor_gimbal_xyz.z(),sqrt(armor_gimbal_xyz.x()*armor_gimbal_xyz.x()+armor_gimbal_xyz.y()*armor_gimbal_xyz.y()));
+
+    target_yaw=std::clamp(target_yaw,Min_Yaw,Max_Yaw);
+    target_pitch=std::clamp(target_pitch,Min_Pitch,Max_Pitch);
+
+    gimbal.send(1,0,target_yaw,target_pitch);
+
+    double timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      t.time_since_epoch()
+    ).count();
+    nlohmann::json plot_data;
+    plot_data["timestamp_ms"] = timestamp_ms;
+    plot_data["task"] = "task1";
+    plot_data["gimbal_control"]["target_yaw_rad"] = target_yaw;
+    plot_data["gimbal_control"]["target_pitch_rad"] = target_pitch;
+    plot_data["gimbal_state"]["current_yaw_rad"] = gimbal_state.yaw;
+    plot_data["gimbal_state"]["current_pitch_rad"] = gimbal_state.pitch;
+    plotter.plot(plot_data);
+
+    cv::putText(img,fmt::format("Target Yaw: {:.2f}rad", target_yaw), cv::Point(20, 30), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0,255,0), 2);
+    cv::putText(img,fmt::format("Target Pitch: {:.2f}rad", target_pitch), cv::Point(20, 70), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0,255,0), 2);
+    cv::imshow("task 1", img);
+    cv::waitKey(1);
     // Your code end
   }
-
-
+  cv::destroyAllWindows();
   return 0;
 }
