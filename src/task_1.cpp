@@ -56,6 +56,11 @@ int main(int argc, char * argv[])
   const float Max_Pitch=M_PI/9;
   const float Min_Pitch=-M_PI/9;
 
+  float filtered_yaw=0.0f;
+  float last_yaw=0.0f;
+  const float alpha=0.3f;
+  const float MAX_YAW_DELTA=0.1f;
+
   while (!exiter.exit()) {
     // Your code start
     camera.read(img,t);
@@ -78,8 +83,11 @@ int main(int argc, char * argv[])
     Eigen::Matrix3d R_gimbal2world=solver.R_gimbal2world(); 
     Eigen::Vector3d armor_gimbal_xyz=R_gimbal2world.transpose()*armor_world_xyz;
 
-    float target_yaw=atan2(armor_gimbal_xyz.y(),armor_gimbal_xyz.x());
-    float target_pitch=atan2(armor_gimbal_xyz.z(),sqrt(armor_gimbal_xyz.x()*armor_gimbal_xyz.x()+armor_gimbal_xyz.y()*armor_gimbal_xyz.y()));
+    float raw_yaw=atan2(armor_gimbal_xyz.y(),armor_gimbal_xyz.x());
+    filtered_yaw=alpha*raw_yaw+(1-alpha)*filtered_yaw;
+    float target_yaw=std::clamp(filtered_yaw,last_yaw-MAX_YAW_DELTA,last_yaw+MAX_YAW_DELTA);
+    last_yaw=target_yaw;
+    float target_pitch=-1.1*atan2(armor_gimbal_xyz.z(),sqrt(armor_gimbal_xyz.x()*armor_gimbal_xyz.x()+armor_gimbal_xyz.y()*armor_gimbal_xyz.y()));
 
     target_yaw=std::clamp(target_yaw,Min_Yaw,Max_Yaw);
     target_pitch=std::clamp(target_pitch,Min_Pitch,Max_Pitch);
