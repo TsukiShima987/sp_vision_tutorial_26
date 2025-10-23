@@ -51,6 +51,13 @@ int main(int argc, char * argv[])
   int frame_count = 0;
   io::GimbalState gimbal_state;
 
+  int img_width=640;
+  int img_height=480;
+  cv::Point2f img_center(img_width/2.0f,img_height/2.0f);
+  const float DEAD_ZONE=10.0f;
+  const float Kp_yaw=0.0015f;
+  const float Kp_pitch=0.0015f;
+
   const float Max_Yaw = M_PI;
   const float Min_Yaw = -M_PI;
   const float Max_Pitch = M_PI / 9;
@@ -116,6 +123,9 @@ int main(int argc, char * argv[])
         transition_count = 0;
         last_yaw = 0.0f;
       }
+      cv::circle(img, img_center, 5, cv::Scalar(0, 0, 255), -1);
+      cv::imshow("task 1", img);
+      cv::waitKey(1);
       continue;
     }
 
@@ -142,7 +152,19 @@ int main(int argc, char * argv[])
     Eigen::Matrix3d R_gimbal2world = solver.R_gimbal2world();
     Eigen::Vector3d armor_gimbal_xyz = R_gimbal2world.transpose() * armor_world_xyz;
 
-    float raw_yaw = atan2(armor_gimbal_xyz.y(), armor_gimbal_xyz.x());
+    float pixel_delta_x = target_armor.center.x - img_center.x;
+    float pixel_delta_y = target_armor.center.y - img_center.y;
+
+    float yaw_compensate = 0.0f;
+    float pitch_compensate = 0.0f;
+    if (fabs(pixel_delta_x) > DEAD_ZONE) {
+      yaw_compensate = pixel_delta_x * Kp_yaw;
+    }
+    if (fabs(pixel_delta_y) > DEAD_ZONE) {
+      pitch_compensate = -pixel_delta_y * Kp_pitch;
+    }
+
+    float raw_yaw = atan2(armor_gimbal_xyz.y(), armor_gimbal_xyz.x())+yaw_compensate;
     
     float yaw_delta = fabs(raw_yaw - last_target_yaw);
     if (yaw_history.size() > 0 && yaw_delta > YAW_DELTA_THRESH) {
@@ -192,7 +214,7 @@ int main(int argc, char * argv[])
       target_yaw = std::clamp(target_yaw, Min_Yaw, Max_Yaw);
     }
 
-    float target_pitch = -1.1 * atan2(armor_gimbal_xyz.z(),sqrt(armor_gimbal_xyz.x() * armor_gimbal_xyz.x() + armor_gimbal_xyz.y() * armor_gimbal_xyz.y()));
+    float target_pitch = -1.1 * atan2(armor_gimbal_xyz.z(),sqrt(armor_gimbal_xyz.x() * armor_gimbal_xyz.x() + armor_gimbal_xyz.y() * armor_gimbal_xyz.y()))+pitch_compensate;
     target_pitch = std::clamp(target_pitch, Min_Pitch, Max_Pitch);
 
     gimbal.send(true, false, target_yaw, target_pitch);
