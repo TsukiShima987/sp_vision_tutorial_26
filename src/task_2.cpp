@@ -57,6 +57,7 @@ int main(int argc, char * argv[])
   const float Max_Pitch=M_PI/9;
   const float Min_Pitch=-M_PI/9;  
   const double GRAVITY = 9.7833; 
+  
 
   while (!exiter.exit()) {
     // Your code start
@@ -81,12 +82,13 @@ int main(int argc, char * argv[])
 
     double distance = target_armor.ypd_in_world[2];
     double bullet_speed = gimbal_state.bullet_speed;
-    float target_pitch = -tools::Trajectory(bullet_speed,distance,target_armor.xyz_in_world).pitch;
+    float target_pitch = -tools::Trajectory(bullet_speed,distance,target_armor.xyz_in_world[2]).pitch;
 
     gimbal.send(1,1,target_yaw,target_pitch);
 
     double timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
       t.time_since_epoch()
+      
     ).count();
     nlohmann::json plot_data;
     plot_data["timestamp_ms"] = timestamp_ms;

@@ -29,7 +29,7 @@ Target::Target(
   // w: angular velocity
   // l: r2 - r1
   // h: z2 - z1
-  Eigen::VectorXd x0{{2.0, 0, 0, 0, 0, 0, 0, 6.5, 0.18, 0.08, 0}};  //初始化预测量
+  Eigen::VectorXd x0{{2.0, 0, 0, 0, 0, 0, 0, 3.0, 0.1, 0.08, 0}};  //初始化预测量
   Eigen::MatrixXd P0 = P0_dig.asDiagonal();
 
   // 防止夹角求和出现异常值
@@ -73,8 +73,8 @@ void Target::predict(double dt)
   double v1, v2;
 
   // TODO: 根据实际情况，调整v1与v2
-  v1 = 0.05;  // 加速度方差
-  v2 = 0.3;  // 角加速度方差
+  v1 = 0.02;  // 加速度方差
+  v2 = 0.15;  // 角加速度方差
 
   auto a = dt * dt * dt * dt / 4;
   auto b = dt * dt * dt / 2;
